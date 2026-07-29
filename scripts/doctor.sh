@@ -20,9 +20,15 @@ for path in "${expected[@]}"; do
   git config -f .gitmodules --get-regexp '^submodule\..*\.path$' |
     awk '{print $2}' |
     grep -Fx "$path" >/dev/null ||
-    { echo "missing submodule declaration: $path" >&2; exit 1; }
+    {
+      echo "missing submodule declaration: $path" >&2
+      exit 1
+    }
   test -e "$path/.git" ||
-    { echo "submodule is not initialized: $path" >&2; exit 1; }
+    {
+      echo "submodule is not initialized: $path" >&2
+      exit 1
+    }
 done
 
 if git submodule status --recursive | grep -E '^[+-]'; then

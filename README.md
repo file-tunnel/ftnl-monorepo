@@ -28,7 +28,7 @@ then this workspace advances the pin in one reviewable commit.
 ```bash
 git clone --recurse-submodules https://github.com/file-tunnel/ftnl-monorepo.git
 cd ftnl-monorepo
-./scripts/doctor.sh
+nix develop --command agent-check
 ```
 
 Nested submodules are required because `ftnl-sync` pins the reviewed
@@ -37,11 +37,16 @@ Nested submodules are required because `ftnl-sync` pins the reviewed
 ## Local integration
 
 ```bash
+nix develop
 docker compose up --build
 ```
 
 The compose profile starts the Rust API and phone portal. Use the E2E
 repository for the two-browser QR handoff contract.
+
+Each submodule owns its language toolchain and exposes the same
+`nix develop --command agent-check` convention. The monorepo shell is kept
+small and only carries orchestration, gitlink, and Compose tooling.
 
 ## Pin policy
 
