@@ -1,0 +1,27 @@
+[submodule "apps/backend-api"]
+	path = apps/backend-api
+	url = https://github.com/file-tunnel/ftnl-backend-api.rs.git
+[submodule "apps/web-server"]
+	path = apps/web-server
+	url = https://github.com/file-tunnel/ftnl-web-server.rs.git
+[submodule "apps/ui-components"]
+	path = apps/ui-components
+	url = https://github.com/file-tunnel/ftnl-ui-components.git
+[submodule "apps/clients"]
+	path = apps/clients
+	url = https://github.com/file-tunnel/ftnl-clients.git
+[submodule "apps/interfaces"]
+	path = apps/interfaces
+	url = https://github.com/file-tunnel/ftnl-interfaces.git
+[submodule "apps/sync"]
+	path = apps/sync
+	url = https://github.com/file-tunnel/ftnl-sync.git
+[submodule "apps/infra"]
+	path = apps/infra
+	url = https://github.com/file-tunnel/ftnl-infra.git
+[submodule "apps/e2e"]
+	path = apps/e2e
+	url = https://github.com/file-tunnel/ftnl-e2e.git
+[submodule "apps/site"]
+	path = apps/site
+	url = https://github.com/file-tunnel/file-tunnel.github.io.git

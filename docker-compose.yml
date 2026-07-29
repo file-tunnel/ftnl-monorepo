@@ -1,0 +1,22 @@
+services:
+  backend-api:
+    build:
+      context: apps/backend-api
+    environment:
+      FTNL_BIND: 0.0.0.0:8080
+      FTNL_PORTAL_ORIGIN: http://localhost:3000
+      RUST_LOG: ftnl_backend_api=info,tower_http=info
+    ports:
+      - "8080:8080"
+
+  web-server:
+    build:
+      context: apps/web-server
+    environment:
+      FTNL_WEB_BIND: 0.0.0.0:3000
+      FTNL_API_ORIGIN: http://localhost:8080
+    ports:
+      - "3000:3000"
+    depends_on:
+      backend-api:
+        condition: service_started

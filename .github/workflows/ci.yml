@@ -1,0 +1,19 @@
+name: monorepo-ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  pins:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          submodules: recursive
+      - run: ./scripts/doctor.sh
+      - run: docker compose config --quiet
