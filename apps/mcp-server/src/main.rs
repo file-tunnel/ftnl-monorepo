@@ -118,11 +118,10 @@ fn handle_request(request: Value) -> Option<Value> {
     }
 
     let modern = request_protocol_version(&params) == Some(MODERN_PROTOCOL_VERSION);
-    if let Some(version) = request_protocol_version(&params)
-        && version != MODERN_PROTOCOL_VERSION
-        && version != LEGACY_PROTOCOL_VERSION
-    {
-        return Some(error_response(id, -32022, "Unsupported protocol version"));
+    if let Some(version) = request_protocol_version(&params) {
+        if version != MODERN_PROTOCOL_VERSION && version != LEGACY_PROTOCOL_VERSION {
+            return Some(error_response(id, -32022, "Unsupported protocol version"));
+        }
     }
 
     let result = match method {
