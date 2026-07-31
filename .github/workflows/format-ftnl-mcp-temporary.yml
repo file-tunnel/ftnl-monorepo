@@ -1,0 +1,36 @@
+name: Format File Tunnel MCP server once
+
+on:
+  push:
+    branches:
+      - agent/den-973-ftnl-mcp-server
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    if: ${{ github.actor != 'github-actions[bot]' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out feature branch
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: agent/den-973-ftnl-mcp-server
+          persist-credentials: true
+
+      - name: Install pinned Rust toolchain
+        run: rustup toolchain install 1.85.0 --profile minimal --component rustfmt
+
+      - name: Apply rustfmt and remove this workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo +1.85.0 fmt --manifest-path apps/mcp-server/Cargo.toml --all
+          rm .github/workflows/format-ftnl-mcp-temporary.yml
+          git add -A
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'style(mcp): apply rustfmt'
+          git push origin HEAD:agent/den-973-ftnl-mcp-server
