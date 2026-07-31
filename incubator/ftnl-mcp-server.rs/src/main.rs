@@ -1,6 +1,6 @@
 use std::{env, sync::Arc, time::Duration};
 
-use reqwest::{Client, Response, StatusCode, Url, redirect::Policy};
+use reqwest::{Client, Response, Url, redirect::Policy};
 use rmcp::{
     ErrorData as McpError, ServiceExt,
     handler::server::wrapper::Parameters,
