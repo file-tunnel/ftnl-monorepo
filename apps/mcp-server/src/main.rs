@@ -461,10 +461,7 @@ mod tests {
                 "arguments": {"size_bytes": 10_000_000, "chunk_size_bytes": 1_000_000}
             }),
         );
-        assert_eq!(
-            response["result"]["structuredContent"]["chunk_count"],
-            10
-        );
+        assert_eq!(response["result"]["structuredContent"]["chunk_count"], 10);
         assert_eq!(
             response["result"]["structuredContent"]["last_chunk_bytes"],
             1_000_000
@@ -499,7 +496,10 @@ mod tests {
             }),
         );
         assert_eq!(response["result"]["resultType"], "complete");
-        assert_eq!(response["result"]["supportedVersions"][0], MODERN_PROTOCOL_VERSION);
+        assert_eq!(
+            response["result"]["supportedVersions"][0],
+            MODERN_PROTOCOL_VERSION
+        );
         assert_eq!(response["result"]["ttlMs"], 0);
     }
 
@@ -515,7 +515,10 @@ mod tests {
         );
         assert_eq!(response["result"]["cacheScope"], "private");
         assert_eq!(response["result"]["ttlMs"], 0);
-        assert_eq!(response["result"]["tools"].as_array().map(Vec::len), Some(3));
+        assert_eq!(
+            response["result"]["tools"].as_array().map(Vec::len),
+            Some(3)
+        );
     }
 
     #[test]
