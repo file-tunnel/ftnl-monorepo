@@ -1,0 +1,38 @@
+# Crate manifest for ftnl-mcp-server: a read-only / build-only MCP server (stdio)
+# with tools for the File Tunnel org (github.com/file-tunnel) — secure,
+# ephemeral, QR-connected cross-device file transfers. See README.md for the
+# tool table and env configuration.
+[package]
+name = "ftnl-mcp-server"
+version = "0.1.0"
+edition = "2021"
+description = "MCP server for File Tunnel — secure, ephemeral, QR-connected cross-device file transfers. Read-only/build-only tools: org/git navigation, cargo build/check runners, tunnel/transfer API health & route probes, interface-contract & repo/release inventory, monorepo pins, org CI, github.io site check, domain tooling, and Supabase client-telemetry debugging."
+license = "MIT"
+
+[lib]
+name = "ftnl_mcp_server"
+path = "src/lib.rs"
+
+[[bin]]
+name = "ftnl-mcp"
+path = "src/main.rs"
+
+[dependencies]
+# Official Rust MCP SDK: stdio transport + #[tool]/#[tool_router] macros.
+rmcp = { version = "2.2", features = ["server", "macros", "schemars", "transport-io"] }
+# process: shelling out to cargo/git/openssl; time: command timeouts;
+# net: localhost port probes for the tunnel/transfer API.
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "net", "process", "time"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+schemars = "1"
+chrono = "0.4"
+opentelemetry = "0.27"
+opentelemetry-otlp = { version = "0.27", features = ["grpc-tonic", "metrics", "trace"] }
+opentelemetry_sdk = { version = "0.27", features = ["rt-tokio"] }
+# rustls (no OpenSSL link): DoH/RDAP, Cloudflare v4, GitHub REST, Supabase
+# PostgREST, the tunnel/transfer API probe, and the github.io site check.
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
+tracing = "0.1"
+tracing-opentelemetry = "0.28"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "json"] }

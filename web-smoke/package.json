@@ -1,0 +1,12 @@
+{
+  "name": "file-tunnel-web-smoke",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Playwright browser smoke against the live File Tunnel web surface. Run in CI via .github/workflows/web-smoke.yml.",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.49.1"
+  }
+}

@@ -1,0 +1,6 @@
+/target
+**/*.rs.bk
+.DS_Store
+/web-smoke/node_modules
+/web-smoke/test-results
+/web-smoke/playwright-report
