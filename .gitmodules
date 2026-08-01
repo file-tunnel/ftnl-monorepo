@@ -25,3 +25,6 @@
 [submodule "apps/site"]
 	path = apps/site
 	url = https://github.com/file-tunnel/file-tunnel.github.io.git
+[submodule "apps/mcp-server"]
+	path = apps/mcp-server
+	url = https://github.com/file-tunnel/ftnl-mcp-server.rs.git
