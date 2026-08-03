@@ -7,6 +7,7 @@ on:
     paths:
       - '.github/workflows/den-779-materialize-bounded-process.yml'
       - '.github/workflows/den-779-pr-run-materializer.yml'
+      - 'scripts/den779_patch_util.py'
       - 'Cargo.toml'
       - 'tests/bounded_process_output.rs'
 
@@ -31,21 +32,8 @@ jobs:
           ref: agent/den-779-bounded-subprocess-output
           fetch-depth: 0
           persist-credentials: true
-      - name: Execute the audited source transformation
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 - <<'PY'
-          import subprocess
-          from pathlib import Path
-
-          source = Path('.github/workflows/den-779-materialize-bounded-process.yml')
-          lines = source.read_text(encoding='utf-8').splitlines()
-          start = lines.index("          python3 - <<'PY'") + 1
-          end = lines.index('          PY', start)
-          script = '\n'.join(line[10:] for line in lines[start:end]) + '\n'
-          subprocess.run(['python3', '-c', script], check=True)
-          PY
+      - name: Execute the audited structural source transformation
+        run: python3 scripts/den779_patch_util.py
       - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
         with:
           toolchain: '1.97.1'
