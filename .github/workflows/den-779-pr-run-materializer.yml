@@ -1,0 +1,70 @@
+name: DEN-779 run bounded-process materializer on PR
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main]
+    paths:
+      - '.github/workflows/den-779-materialize-bounded-process.yml'
+      - '.github/workflows/den-779-pr-run-materializer.yml'
+      - 'Cargo.toml'
+      - 'tests/bounded_process_output.rs'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: den-779-pr-run-materializer
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    if: >-
+      github.repository == 'file-tunnel/ftnl-mcp-server.rs' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.head_ref == 'agent/den-779-bounded-subprocess-output'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: agent/den-779-bounded-subprocess-output
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Execute the audited source transformation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import subprocess
+          from pathlib import Path
+
+          source = Path('.github/workflows/den-779-materialize-bounded-process.yml')
+          lines = source.read_text(encoding='utf-8').splitlines()
+          start = lines.index("          python3 - <<'PY'") + 1
+          end = lines.index('          PY', start)
+          script = '\n'.join(line[10:] for line in lines[start:end]) + '\n'
+          subprocess.run(['python3', '-c', script], check=True)
+          PY
+      - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
+        with:
+          toolchain: '1.97.1'
+          components: rustfmt, clippy
+      - name: Validate and publish the product repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo fmt --all
+          cargo clippy --locked --all-targets -- -D warnings
+          cargo test --locked --all-targets
+          cargo build --locked --release
+          if git grep -n 'wait_with_output' -- src; then
+            echo 'unbounded child output capture remains' >&2
+            exit 1
+          fi
+          git add Cargo.toml src/util.rs tests/bounded_process_output.rs
+          git diff --cached --check
+          git config user.name 'ORESoftware'
+          git config user.email '11139560+ORESoftware@users.noreply.github.com'
+          git commit -m 'fix(DEN-779): bound subprocess stdout and stderr before buffering'
+          git push origin HEAD:agent/den-779-bounded-subprocess-output
