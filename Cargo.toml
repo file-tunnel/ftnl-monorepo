@@ -20,6 +20,7 @@ path = "src/main.rs"
 [dependencies]
 # Official Rust MCP SDK: stdio transport + #[tool]/#[tool_router] macros.
 rmcp = { version = "2.2", features = ["server", "macros", "schemars", "transport-io"] }
+ore-mcp-process = { git = "https://github.com/ORESoftware/mcp-rust-libs", rev = "9aa28fb1680bc846d950e7544de55aa9c6cc93c8" }
 # process: shelling out to cargo/git/openssl; time: command timeouts;
 # io-util: concurrent bounded reads from child stdout/stderr; net: localhost
 # port probes for the tunnel/transfer API.

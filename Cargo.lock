@@ -306,6 +306,7 @@ dependencies = [
  "opentelemetry",
  "opentelemetry-otlp",
  "opentelemetry_sdk",
+ "ore-mcp-process",
  "reqwest",
  "rmcp",
  "schemars",
@@ -930,6 +931,20 @@ dependencies = [
  "tokio-stream",
  "tracing",
 ]
+
+[[package]]
+name = "ore-mcp-process"
+version = "0.1.0"
+source = "git+https://github.com/ORESoftware/mcp-rust-libs?rev=9aa28fb1680bc846d950e7544de55aa9c6cc93c8#9aa28fb1680bc846d950e7544de55aa9c6cc93c8"
+dependencies = [
+ "ore-mcp-safety",
+ "tokio",
+]
+
+[[package]]
+name = "ore-mcp-safety"
+version = "0.1.0"
+source = "git+https://github.com/ORESoftware/mcp-rust-libs?rev=9aa28fb1680bc846d950e7544de55aa9c6cc93c8#9aa28fb1680bc846d950e7544de55aa9c6cc93c8"
 
 [[package]]
 name = "pastey"
