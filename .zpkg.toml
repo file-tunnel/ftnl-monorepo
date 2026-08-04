@@ -1,0 +1,31 @@
+[package]
+org = "file-tunnel"
+name = "ftnl-mcp-server"
+version = "0.1.0"
+description = "Global stdio MCP tooling for the File Tunnel fleet"
+license = "MIT"
+keywords = ["mcp", "file-transfer", "tunnels", "agents", "global-tool"]
+language = "rust"
+
+[package.repository]
+vcs = "git"
+url = "https://github.com/file-tunnel/ftnl-mcp-server.rs"
+
+[build]
+command = "cargo build --release --locked --bin ftnl-mcp"
+outputs = ["target/release/ftnl-mcp"]
+
+[bin]
+ftnl-mcp = "target/release/ftnl-mcp"
+
+[publish]
+include_readme = true
+tag_format = "v{version}"
+smoke_test = "cargo test --manifest-path \"$ZED_PKG_TEST_TARGET/Cargo.toml\" --all-targets --locked && test -x \"$ZED_PKG_TEST_TARGET/target/release/ftnl-mcp\""
+exclude = [".env", ".env.*", ".direnv/**", ".zed/**", ".zed-pack/**", "target/**", "tmp/**", "**/*.log", ".DS_Store"]
+
+[install]
+adapter = "none"
+
+[scripts]
+test = "cargo test --all-targets --locked"
