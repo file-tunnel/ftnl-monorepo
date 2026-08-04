@@ -115,8 +115,7 @@ async fn kills_and_reaps_a_timed_out_child() {
 
 #[test]
 fn process_adapter_delegates_to_immutable_shared_crate() {
-    let source = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/src/util.rs"))
-        .expect("read process adapter source");
+    let source = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/src/util.rs")).expect("read process adapter source");
     assert!(source.contains("ore_mcp_process::{run_bounded"));
     assert!(!source.contains("tokio::process::Command"));
     assert!(!source.contains("async fn read_pipe_bounded"));
