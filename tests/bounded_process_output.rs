@@ -24,9 +24,51 @@ async fn captures_both_pipes_below_the_limits() {
     .expect("bounded child should succeed");
 
     assert!(success);
-    assert!(output.contains("hello"));
-    assert!(output.contains("--- stderr ---"));
-    assert!(output.contains("warning"));
+    assert_eq!(output, "hello\n--- stderr ---\nwarning");
+}
+
+#[tokio::test]
+async fn preserves_nonzero_exit_as_a_product_status() {
+    let (success, output) = run_cmd_with_limits(
+        None,
+        "/bin/sh",
+        &["-c", "printf 'partial'; exit 7"],
+        small_limits(Duration::from_secs(5)),
+    )
+    .await
+    .expect("a nonzero child exit is not a capture failure");
+
+    assert!(!success);
+    assert_eq!(output, "partial");
+}
+
+#[tokio::test]
+async fn rejects_invalid_limits_before_spawning() {
+    let limits = CommandOutputLimits {
+        timeout: Duration::from_secs(5),
+        max_stdout_bytes: 0,
+        max_stderr_bytes: 1024,
+    };
+    let error = run_cmd_with_limits(None, "/bin/sh", &["-c", "exit 0"], limits)
+        .await
+        .expect_err("zero-byte stdout limits must fail closed");
+
+    assert_eq!(error, "invalid subprocess output limits");
+}
+
+#[tokio::test]
+async fn preserves_product_local_missing_program_errors() {
+    let program = "/definitely-not-a-real-ftnl-mcp-program";
+    let error = run_cmd_with_limits(
+        None,
+        program,
+        &[],
+        small_limits(Duration::from_secs(5)),
+    )
+    .await
+    .expect_err("a missing executable must be reported");
+
+    assert!(error.starts_with(&format!("`{program}` not found on PATH:")));
 }
 
 #[tokio::test]
