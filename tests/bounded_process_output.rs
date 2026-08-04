@@ -59,14 +59,9 @@ async fn rejects_invalid_limits_before_spawning() {
 #[tokio::test]
 async fn preserves_product_local_missing_program_errors() {
     let program = "/definitely-not-a-real-ftnl-mcp-program";
-    let error = run_cmd_with_limits(
-        None,
-        program,
-        &[],
-        small_limits(Duration::from_secs(5)),
-    )
-    .await
-    .expect_err("a missing executable must be reported");
+    let error = run_cmd_with_limits(None, program, &[], small_limits(Duration::from_secs(5)))
+        .await
+        .expect_err("a missing executable must be reported");
 
     assert!(error.starts_with(&format!("`{program}` not found on PATH:")));
 }
