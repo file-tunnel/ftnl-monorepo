@@ -21,8 +21,9 @@ path = "src/main.rs"
 # Official Rust MCP SDK: stdio transport + #[tool]/#[tool_router] macros.
 rmcp = { version = "2.2", features = ["server", "macros", "schemars", "transport-io"] }
 # process: shelling out to cargo/git/openssl; time: command timeouts;
-# net: localhost port probes for the tunnel/transfer API.
-tokio = { version = "1", features = ["macros", "rt-multi-thread", "net", "process", "time"] }
+# io-util: concurrent bounded reads from child stdout/stderr; net: localhost
+# port probes for the tunnel/transfer API.
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "io-util", "net", "process", "time"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 schemars = "1"
