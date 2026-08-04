@@ -36,5 +36,43 @@ jobs:
         run: cargo clippy --locked --all-targets -- -D warnings
       - name: Test
         run: cargo test --locked --all-targets
+      - name: Documentation
+        env:
+          RUSTDOCFLAGS: -D warnings
+        run: cargo doc --locked --no-deps
       - name: Release build
         run: cargo build --locked --release
+      - name: Enforce runtime, route, and telemetry boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f OBSERVABILITY.md
+          test -f docs/mcp-api.md
+          test -f src/runtime.rs
+          if [ "$(wc -l < src/main.rs)" -gt 8 ]; then
+            echo 'src/main.rs must remain a thin binary bootstrap' >&2
+            exit 1
+          fi
+          git grep -qF 'pub async fn run_stdio' -- src/runtime.rs
+          git grep -qF 'MAX_OTLP_ENDPOINT_BYTES' -- src/telemetry.rs
+          git grep -qF 'MAX_RESOURCE_ATTRIBUTES_RAW_BYTES' -- src/telemetry.rs
+          git grep -qF 'MAX_RESOURCE_ATTRIBUTES' -- src/telemetry.rs
+          git grep -qF 'sanitize_otlp_endpoint' -- src/telemetry.rs
+          git grep -qF '.with_writer(std::io::stderr)' -- src/telemetry.rs
+          git grep -qF 'mcp.server.tool.calls' -- src/telemetry.rs
+          git grep -qF 'mcp.server.tool.duration' -- src/telemetry.rs
+          git grep -qF 'opens no listening port' -- docs/mcp-api.md
+          if git grep -nE 'serve\(|telemetry::init|FTNL_API_URL' -- src/main.rs; then
+            echo 'runtime lifecycle and configuration diagnostics must not regress into src/main.rs' >&2
+            exit 1
+          fi
+          if git grep -nE '(^|[^[:alnum:]_])print(ln)?!' -- src/main.rs src/runtime.rs src/telemetry.rs; then
+            echo 'stdout writes are forbidden in the MCP runtime and telemetry modules' >&2
+            exit 1
+          fi
+          git diff --check
+      - uses: taiki-e/install-action@18b1216eba7f8039b0f8d131d5473787f0edce68 # v2
+        with:
+          tool: cargo-audit@0.22.2
+      - name: Dependency audit
+        run: cargo audit --deny warnings

@@ -24,6 +24,7 @@ pub mod github;
 pub mod interfaces;
 pub mod prompts;
 pub mod resources;
+pub mod runtime;
 pub mod server;
 pub mod status;
 pub mod supabase;
