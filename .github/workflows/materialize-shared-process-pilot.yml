@@ -1,0 +1,219 @@
+# One-use workflow: replace the repository-local child-process runner with a
+# compatibility adapter over the immutable shared crate, regenerate Cargo.lock,
+# run the complete local Rust gates, commit the reviewable tree, and remove self.
+name: materialize-shared-process-pilot
+
+on:
+  push:
+    branches:
+      - agent/den-957-adopt-ore-mcp-process
+    paths:
+      - '.github/workflows/materialize-shared-process-pilot.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  materialize-test-and-publish:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout pilot branch
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: agent/den-957-adopt-ore-mcp-process
+          persist-credentials: true
+          fetch-depth: 1
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
+        with:
+          toolchain: '1.97.0'
+          components: rustfmt, clippy
+
+      - name: Apply compatibility adapter and regression ratchet
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          shared_rev = '9aa28fb1680bc846d950e7544de55aa9c6cc93c8'
+
+          manifest_path = Path('Cargo.toml')
+          manifest = manifest_path.read_text()
+          dependency = (
+              'ore-mcp-process = { git = "https://github.com/ORESoftware/mcp-rust-libs", '
+              f'rev = "{shared_rev}" }}\n'
+          )
+          if dependency not in manifest:
+              anchor = 'rmcp = { version = "2.2", features = ["server", "macros", "schemars", "transport-io"] }\n'
+              if manifest.count(anchor) != 1:
+                  raise SystemExit('expected one rmcp dependency anchor')
+              manifest = manifest.replace(anchor, anchor + dependency, 1)
+              manifest_path.write_text(manifest)
+
+          util_path = Path('src/util.rs')
+          source = util_path.read_text()
+          old_import = 'use tokio::io::{AsyncRead, AsyncReadExt};\n'
+          new_import = 'use ore_mcp_process::{run_bounded, ProcessError, ProcessLimits};\n'
+          if old_import not in source:
+              raise SystemExit('local async child-pipe import was not found')
+          source = source.replace(old_import, new_import, 1)
+
+          start_marker = '/// Default maximum stdout retained from one child process.\n'
+          end_marker = 'pub async fn git('
+          start = source.find(start_marker)
+          end = source.find(end_marker, start)
+          if start < 0 or end < 0:
+              raise SystemExit('local process-runner boundaries were not found')
+
+          adapter = r'''/// Default maximum stdout retained from one child process.
+          pub const MAX_COMMAND_STDOUT_BYTES: usize = 1024 * 1024;
+
+          /// Default maximum stderr retained from one child process.
+          pub const MAX_COMMAND_STDERR_BYTES: usize = 256 * 1024;
+
+          /// Public compatibility alias retained for callers and integration tests.
+          pub type CommandOutputLimits = ProcessLimits;
+
+          /// Run a command with a timeout and bounded output; returns
+          /// `(exit_ok, combined stdout+stderr)`.
+          pub async fn run_cmd(
+              dir: Option<&Path>,
+              program: &str,
+              args: &[&str],
+              timeout: Duration,
+          ) -> Result<(bool, String), String> {
+              run_cmd_with_limits(
+                  dir,
+                  program,
+                  args,
+                  CommandOutputLimits {
+                      timeout,
+                      max_stdout_bytes: MAX_COMMAND_STDOUT_BYTES,
+                      max_stderr_bytes: MAX_COMMAND_STDERR_BYTES,
+                  },
+              )
+              .await
+          }
+
+          /// Delegate fail-fast child-process capture to the immutable shared crate.
+          ///
+          /// Product argument validation, error wording, and final output rendering
+          /// remain local. Arguments are omitted from failures because diagnostic
+          /// commands can contain private paths or operator input.
+          pub async fn run_cmd_with_limits(
+              dir: Option<&Path>,
+              program: &str,
+              args: &[&str],
+              limits: CommandOutputLimits,
+          ) -> Result<(bool, String), String> {
+              let output = run_bounded(dir, program, args, limits)
+                  .await
+                  .map_err(|error| render_process_error(program, limits, error))?;
+              let mut text = output.stdout_lossy();
+              let stderr = output.stderr_lossy();
+              if !stderr.trim().is_empty() {
+                  text.push_str("\n--- stderr ---\n");
+                  text.push_str(&stderr);
+              }
+              Ok((output.success(), text))
+          }
+
+          fn render_process_error(
+              program: &str,
+              limits: CommandOutputLimits,
+              error: ProcessError,
+          ) -> String {
+              match error {
+                  ProcessError::InvalidLimits => "invalid subprocess output limits".to_string(),
+                  ProcessError::Spawn(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                      format!("`{program}` not found on PATH: {error}")
+                  }
+                  ProcessError::Spawn(error) => format!("failed to spawn {program}: {error}"),
+                  ProcessError::MissingPipe("stdout") => {
+                      "subprocess stdout pipe is unavailable".to_string()
+                  }
+                  ProcessError::MissingPipe("stderr") => {
+                      "subprocess stderr pipe is unavailable".to_string()
+                  }
+                  ProcessError::MissingPipe(pipe) => {
+                      format!("subprocess {pipe} pipe is unavailable")
+                  }
+                  ProcessError::Wait(error) => format!("{program} failed: {error}"),
+                  ProcessError::Read(error) => {
+                      format!("reading subprocess output failed: {error}")
+                  }
+                  ProcessError::StdoutTooLarge => format!(
+                      "subprocess stdout exceeded the {}-byte limit",
+                      limits.max_stdout_bytes
+                  ),
+                  ProcessError::StderrTooLarge => format!(
+                      "subprocess stderr exceeded the {}-byte limit",
+                      limits.max_stderr_bytes
+                  ),
+                  ProcessError::TimedOut => {
+                      format!("`{program}` timed out after {:?}", limits.timeout)
+                  }
+              }
+          }
+
+          '''
+          adapter = ''.join(
+              line[10:] if line.startswith('          ') else line
+              for line in adapter.splitlines(keepends=True)
+          )
+          util_path.write_text(source[:start] + adapter + source[end:])
+
+          test_path = Path('tests/bounded_process_output.rs')
+          tests = test_path.read_text()
+          test_name = 'process_adapter_delegates_to_immutable_shared_crate'
+          if test_name not in tests:
+              tests += r'''
+
+          #[test]
+          fn process_adapter_delegates_to_immutable_shared_crate() {
+              let source = std::fs::read_to_string(concat!(
+                  env!("CARGO_MANIFEST_DIR"),
+                  "/src/util.rs"
+              ))
+              .expect("read process adapter source");
+              assert!(source.contains("ore_mcp_process::{run_bounded"));
+              assert!(!source.contains("tokio::process::Command"));
+              assert!(!source.contains("async fn read_pipe_bounded"));
+          }
+          '''
+              tests = ''.join(
+                  line[10:] if line.startswith('          ') else line
+                  for line in tests.splitlines(keepends=True)
+              )
+              test_path.write_text(tests)
+          PY
+
+      - name: Regenerate lockfile and run all Rust gates
+        shell: bash
+        env:
+          RUSTDOCFLAGS: -D warnings
+        run: |
+          set -euo pipefail
+          cargo check --all-targets
+          cargo fmt --all
+          cargo fmt --all -- --check
+          cargo clippy --locked --all-targets -- -D warnings
+          cargo test --locked --all-targets
+          cargo doc --locked --no-deps
+          cargo build --locked --release
+
+      - name: Commit only the permanent pilot tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm .github/workflows/materialize-shared-process-pilot.yml
+          git diff --check
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git commit -m 'refactor(process): adopt shared fail-fast capture adapter'
+          git push origin HEAD:agent/den-957-adopt-ore-mcp-process
