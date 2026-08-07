@@ -3,3 +3,7 @@
 work/
 .cache/
 .direnv/
+tmp
+temp
+tmp/worktrees
+temp/worktrees
