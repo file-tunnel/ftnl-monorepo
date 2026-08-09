@@ -1,0 +1,26 @@
+[package]
+org = "file-tunnel"
+name = "ftnl-monorepo"
+version = "0.1.0"
+description = "File Tunnel integration workspace with Git-submodule-owned applications"
+license = "MIT"
+keywords = ["monorepo", "submodules", "zed-package", "file-tunnel"]
+
+[package.repository]
+vcs = "git"
+url = "https://github.com/file-tunnel/ftnl-monorepo"
+
+[install]
+dir = ".vendor/.zed"
+
+# Application repositories are owned by Git submodules, not duplicated as Zed
+# dependencies. In particular, CLI and infrastructure are intentionally absent.
+[dependencies]
+
+[publish]
+include_readme = true
+tag_format = "v{version}"
+exclude = [".vendor/.zed/**", ".git/modules/**", "**/target/**", "**/node_modules/**", "**/.dart_tool/**"]
+
+[targets.repository]
+dir = "."
