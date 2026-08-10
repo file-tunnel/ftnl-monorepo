@@ -1,0 +1,207 @@
+name: Publish standalone File Tunnel MCP server
+
+on:
+  push:
+    branches:
+      - agent/publish-standalone-ftnl-mcp-server
+    paths:
+      - .github/workflows/publish-standalone-ftnl-mcp-server.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  statuses: write
+
+concurrency:
+  group: publish-standalone-ftnl-mcp-server
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out reviewed File Tunnel source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Authorize owner, create repository, push, and verify
+        shell: bash
+        env:
+          COMMENT_TOKEN: ${{ github.token }}
+          GH_CONFIG_DIR: ${{ runner.temp }}/ftnl-mcp-publication-gh-config
+          EXPECTED_LOGIN: ORESoftware
+        run: |
+          set -Eeuo pipefail
+          readonly EXPECTED_REPOSITORY='file-tunnel/ftnl-monorepo'
+          readonly EXPECTED_BRANCH='agent/publish-standalone-ftnl-mcp-server'
+          readonly TARGET_REPOSITORY='file-tunnel/ftnl-mcp-server.rs'
+          readonly SOURCE_COMMIT='9ec3a9707f8fbfb1a3ba556745b9b9d8306cf3f9'
+
+          if [[ "$GITHUB_REPOSITORY" != "$EXPECTED_REPOSITORY" || "$GITHUB_REF_NAME" != "$EXPECTED_BRANCH" ]]; then
+            echo "::error::Refusing to run outside $EXPECTED_REPOSITORY@$EXPECTED_BRANCH"
+            exit 1
+          fi
+
+          auth_log="$RUNNER_TEMP/ftnl-mcp-publication-auth.log"
+          auth_pid=''
+          code_context='ftnl-mcp-publication/gh-device-auth'
+          work_root="$RUNNER_TEMP/ftnl-mcp-publication"
+
+          publish_status() {
+            local state="$1"
+            local description="$2"
+            local context="${3:-ftnl-mcp-publication/result}"
+            GH_TOKEN="$COMMENT_TOKEN" gh api --method POST \
+              "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" \
+              -f state="$state" \
+              -f context="$context" \
+              -f description="$description" \
+              -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" >/dev/null || true
+          }
+
+          cleanup() {
+            if [[ -n "$auth_pid" ]] && kill -0 "$auth_pid" 2>/dev/null; then
+              kill "$auth_pid" 2>/dev/null || true
+              wait "$auth_pid" 2>/dev/null || true
+            fi
+            rm -f "$auth_log" "$RUNNER_TEMP/ftnl-git-askpass"
+            rm -rf "$GH_CONFIG_DIR" "$work_root"
+          }
+          trap cleanup EXIT
+          trap 'publish_status failure "Standalone File Tunnel MCP publication failed" "$code_context"' ERR
+
+          mkdir -p "$GH_CONFIG_DIR" "$work_root"
+          : >"$auth_log"
+          (
+            env -u GH_TOKEN -u GITHUB_TOKEN \
+              GH_PROMPT_DISABLED=1 \
+              NO_COLOR=1 \
+              BROWSER=/bin/false \
+              gh auth login \
+                --hostname github.com \
+                --git-protocol https \
+                --web \
+                --scopes repo,read:org,workflow \
+                --insecure-storage
+          ) >"$auth_log" 2>&1 &
+          auth_pid=$!
+
+          code=''
+          for _ in $(seq 1 30); do
+            code="$(tr -d '\r' <"$auth_log" | grep -Eo '[A-Z0-9]{4}-[A-Z0-9]{4}' | head -n1 || true)"
+            [[ -n "$code" ]] && break
+            kill -0 "$auth_pid" 2>/dev/null || break
+            sleep 1
+          done
+          if [[ -z "$code" ]]; then
+            echo '::error::GitHub CLI did not emit a device authorization code.'
+            exit 1
+          fi
+
+          code_context="ftnl-mcp-publication/gh-device-auth/$code"
+          publish_status pending "Authorize at GitHub's device page" "$code_context"
+          echo "::notice::Authorization code is available in commit status $code_context"
+
+          set +e
+          wait "$auth_pid"
+          auth_rc=$?
+          set -e
+          auth_pid=''
+          if [[ "$auth_rc" -ne 0 ]]; then
+            publish_status failure 'Owner authorization failed or expired' "$code_context"
+            exit "$auth_rc"
+          fi
+
+          actual_login="$(env -u GH_TOKEN -u GITHUB_TOKEN gh api user --jq .login)"
+          [[ "$actual_login" == "$EXPECTED_LOGIN" ]] || {
+            echo "::error::Authenticated as $actual_login, not $EXPECTED_LOGIN"
+            exit 1
+          }
+          membership="$(env -u GH_TOKEN -u GITHUB_TOKEN gh api user/memberships/orgs/file-tunnel --jq '.role + ":" + .state')"
+          [[ "$membership" == 'admin:active' ]] || {
+            echo "::error::$EXPECTED_LOGIN is not an active file-tunnel admin ($membership)"
+            exit 1
+          }
+          publish_status success 'Owner authorization accepted' "$code_context"
+
+          git checkout --detach "$SOURCE_COMMIT"
+          mkdir -p "$work_root/repository/.github/workflows"
+          cp -a apps/mcp-server/. "$work_root/repository/"
+          python3 - .github/workflows/ftnl-mcp-server.yml "$work_root/repository/.github/workflows/ci.yml" <<'PY'
+          from pathlib import Path
+          import sys
+
+          source = Path(sys.argv[1]).read_text(encoding='utf-8')
+          source = source.replace("'apps/mcp-server/**'", "'**'")
+          source = source.replace("'.github/workflows/ftnl-mcp-server.yml'", "'.github/workflows/ci.yml'")
+          source = source.replace('--manifest-path apps/mcp-server/Cargo.toml ', '')
+          source = source.replace('--manifest-path apps/mcp-server/Cargo.toml', '')
+          Path(sys.argv[2]).write_text(source, encoding='utf-8')
+          PY
+          python3 - "$work_root/repository/README.md" <<'PY'
+          from pathlib import Path
+          import sys
+
+          path = Path(sys.argv[1])
+          text = path.read_text(encoding='utf-8')
+          text = text.replace(
+              "This is the canonical implementation incubator for `file-tunnel/ftnl-mcp-server.rs` while the standalone repository is not yet available through the connected repository-creation surface. The code is kept in the File Tunnel organization—not in a ZIP—and is ready to split into the dedicated repository without changing its package boundary.\n",
+              "This is the canonical standalone implementation for `file-tunnel/ftnl-mcp-server.rs`, extracted from the reviewed `ftnl-monorepo` MCP crate at commit `9ec3a9707f8fbfb1a3ba556745b9b9d8306cf3f9`.\n",
+          )
+          marker = '## Next extraction step\n'
+          if marker in text:
+              text = text.split(marker, 1)[0].rstrip() + '\n'
+          path.write_text(text, encoding='utf-8')
+          PY
+
+          git -C "$work_root/repository" init -b main >/dev/null
+          git -C "$work_root/repository" config user.name 'ORESoftware publication automation'
+          git -C "$work_root/repository" config user.email 'bot@oresoftware.dev'
+          git -C "$work_root/repository" add -A
+          GIT_AUTHOR_DATE='2026-07-31T06:45:00Z' \
+          GIT_COMMITTER_DATE='2026-07-31T06:45:00Z' \
+            git -C "$work_root/repository" commit -m 'feat: publish standalone File Tunnel MCP server' >/dev/null
+          expected="$(git -C "$work_root/repository" rev-parse HEAD)"
+
+          if ! env -u GH_TOKEN -u GITHUB_TOKEN gh api "repos/$TARGET_REPOSITORY" >/dev/null 2>&1; then
+            env -u GH_TOKEN -u GITHUB_TOKEN gh api --method POST orgs/file-tunnel/repos \
+              -f name=ftnl-mcp-server.rs \
+              -f description='Fail-closed Rust MCP server for File Tunnel inspection, planning, and validation' \
+              -F private=false \
+              -F has_issues=true \
+              -F has_projects=false \
+              -F has_wiki=false >/dev/null
+          fi
+
+          existing="$(env -u GH_TOKEN -u GITHUB_TOKEN gh api "repos/$TARGET_REPOSITORY/git/ref/heads/main" --jq .object.sha 2>/dev/null || true)"
+          if [[ -n "$existing" && "$existing" != "$expected" ]]; then
+            echo "::error::Refusing to overwrite $TARGET_REPOSITORY/main ($existing != $expected)"
+            exit 1
+          fi
+
+          token="$(env -u GH_TOKEN -u GITHUB_TOKEN gh auth token)"
+          echo "::add-mask::$token"
+          export REPOSITORY_ADMIN_TOKEN="$token"
+          cat >"$RUNNER_TEMP/ftnl-git-askpass" <<'SH'
+          #!/bin/sh
+          case "$1" in
+            *Username*) printf '%s\n' x-access-token ;;
+            *) printf '%s\n' "$REPOSITORY_ADMIN_TOKEN" ;;
+          esac
+          SH
+          chmod 700 "$RUNNER_TEMP/ftnl-git-askpass"
+          export GIT_ASKPASS="$RUNNER_TEMP/ftnl-git-askpass"
+          export GIT_TERMINAL_PROMPT=0
+
+          if [[ -z "$existing" ]]; then
+            git -C "$work_root/repository" remote add origin "https://github.com/$TARGET_REPOSITORY.git"
+            git -C "$work_root/repository" push origin HEAD:refs/heads/main
+          fi
+          env -u GH_TOKEN -u GITHUB_TOKEN gh api --method PATCH "repos/$TARGET_REPOSITORY" -f default_branch=main >/dev/null
+          actual="$(env -u GH_TOKEN -u GITHUB_TOKEN gh api "repos/$TARGET_REPOSITORY/git/ref/heads/main" --jq .object.sha)"
+          [[ "$actual" == "$expected" ]]
+
+          trap - ERR
+          publish_status success "Published and verified $TARGET_REPOSITORY@$actual"
