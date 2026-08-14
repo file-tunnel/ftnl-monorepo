@@ -9,7 +9,11 @@ import tomllib
 from urllib.parse import urlparse
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-FORBIDDEN_REPOS = {"file-tunnel/ftnl-cli", "file-tunnel/ftnl-infra"}
+STANDALONE_ONLY_REPOS = {
+    "file-tunnel/ftnl-cli",
+    "file-tunnel/ftnl-infra",
+    "file-tunnel/ftnl-mcp-server.rs",
+}
 
 
 def fail(message: str) -> None:
@@ -37,8 +41,8 @@ if (ROOT / ".zpkg.lock").read_text(encoding="utf-8").strip() != "version = 1":
     fail(".zpkg.lock must contain exactly 'version = 1'")
 
 dependencies = set(manifest.get("dependencies", {}))
-if dependencies & FORBIDDEN_REPOS:
-    fail(f"CLI/infra Zed dependencies are forbidden: {sorted(dependencies & FORBIDDEN_REPOS)}")
+if dependencies & STANDALONE_ONLY_REPOS:
+    fail(f"standalone-only Zed dependencies are forbidden: {sorted(dependencies & STANDALONE_ONLY_REPOS)}")
 
 parser = configparser.ConfigParser()
 parser.read(ROOT / ".gitmodules", encoding="utf-8")
@@ -53,9 +57,9 @@ for section in parser.sections():
         fail(f"duplicate submodule repository: {repo}")
     submodules[path] = repo
 
-forbidden_submodules = set(submodules.values()) & FORBIDDEN_REPOS
+forbidden_submodules = set(submodules.values()) & STANDALONE_ONLY_REPOS
 if forbidden_submodules:
-    fail(f"CLI/infra submodules are forbidden: {sorted(forbidden_submodules)}")
+    fail(f"standalone-only submodules are forbidden: {sorted(forbidden_submodules)}")
 
 dual_owned = set(submodules.values()) & dependencies
 if dual_owned:
