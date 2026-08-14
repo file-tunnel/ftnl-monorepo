@@ -16,7 +16,7 @@ jobs:
         with:
           submodules: false
           fetch-depth: 1
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - run: python scripts/validate_zed_submodule_ownership.py
