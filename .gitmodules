@@ -22,6 +22,3 @@
 [submodule "apps/site"]
 	path = apps/site
 	url = https://github.com/file-tunnel/file-tunnel.github.io.git
-[submodule "apps/ftnl-sidecar.rs"]
-	path = apps/ftnl-sidecar.rs
-	url = https://github.com/file-tunnel/ftnl-sidecar.rs.git

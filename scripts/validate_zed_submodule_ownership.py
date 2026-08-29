@@ -13,6 +13,7 @@ STANDALONE_ONLY_REPOS = {
     "file-tunnel/ftnl-cli",
     "file-tunnel/ftnl-infra",
     "file-tunnel/ftnl-mcp-server.rs",
+    "file-tunnel/ftnl-sidecar.rs",
 }
 
 
