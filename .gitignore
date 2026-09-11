@@ -22,3 +22,6 @@ env/dec/
 *.age-key
 keys.txt
 sops-private*.txt
+
+# machine-local symlink to ORESoftware/my-ai AGENTS.md; never committed
+.ores/
