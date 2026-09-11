@@ -33,6 +33,12 @@ is a private standalone application with its own CI and release boundary. It is
 intentionally not a submodule of this public repository because the default
 public-repository Actions token cannot read private sibling repositories.
 
+[`file-tunnel/ftnl-sidecar.rs`](https://github.com/file-tunnel/ftnl-sidecar.rs)
+is also a private standalone deployable application. Its owning repository
+builds, tests, and publishes the sidecar artifact; deployment integration uses
+that immutable artifact instead of requiring this public repository to clone a
+private Git submodule.
+
 ## Clone
 
 ```bash
@@ -58,7 +64,8 @@ Each application submodule owns its language toolchain and exposes the same
 `nix develop --command agent-check` convention. The monorepo shell is kept
 small and only carries orchestration, gitlink, and Compose tooling.
 
-Run and validate the MCP server from its owning standalone repository.
+Run and validate the MCP server and sidecar from their owning standalone
+repositories.
 
 ## Pin policy
 
