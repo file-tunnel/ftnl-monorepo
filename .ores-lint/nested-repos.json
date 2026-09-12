@@ -1,0 +1,10 @@
+[
+ "apps/backend-api",
+ "apps/clients",
+ "apps/e2e",
+ "apps/interfaces",
+ "apps/site",
+ "apps/sync",
+ "apps/ui-components",
+ "apps/web-server"
+]
