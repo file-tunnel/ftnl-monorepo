@@ -16,15 +16,9 @@
 [submodule "apps/sync"]
 	path = apps/sync
 	url = https://github.com/file-tunnel/ftnl-sync.git
-[submodule "apps/infra"]
-	path = apps/infra
-	url = https://github.com/file-tunnel/ftnl-infra.git
 [submodule "apps/e2e"]
 	path = apps/e2e
 	url = https://github.com/file-tunnel/ftnl-e2e.git
 [submodule "apps/site"]
 	path = apps/site
 	url = https://github.com/file-tunnel/file-tunnel.github.io.git
-[submodule "apps/mcp-server"]
-	path = apps/mcp-server
-	url = https://github.com/file-tunnel/ftnl-mcp-server.rs.git
