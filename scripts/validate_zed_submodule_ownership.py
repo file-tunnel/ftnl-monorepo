@@ -23,15 +23,39 @@ def fail(message: str) -> None:
 
 
 def repo_from_url(url: str) -> str:
-    normalized = url.strip()
-    if normalized.startswith("git@github.com:"):
-        path = normalized.split(":", 1)[1]
-    else:
-        parsed = urlparse(normalized)
-        if parsed.hostname != "github.com":
-            fail(f"unsupported non-GitHub submodule URL: {url}")
-        path = parsed.path.lstrip("/")
-    return path.removesuffix(".git")
+    # Keep the ownership gate aligned with doctor.sh: submodules must use
+    # canonical HTTPS URLs in this organization, never SCP aliases, redirects,
+    # credentials, extra paths, or traversal segments.
+    parsed = urlparse(url)
+    if (
+        parsed.scheme != "https"
+        or parsed.hostname != "github.com"
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.port is not None
+        or parsed.query
+        or parsed.fragment
+        or not parsed.path.endswith(".git")
+    ):
+        fail("submodule URL must be canonical GitHub HTTPS without credentials")
+    parts = parsed.path.removeprefix("/").removesuffix(".git").split("/")
+    if (
+        len(parts) != 2
+        or parts[0] != "file-tunnel"
+        or not parts[1]
+        or parts[1].startswith(".")
+        or not all(char.isascii() and (char.isalnum() or char in "._-") for char in parts[1])
+    ):
+        fail("submodule URL must target one file-tunnel repository")
+    return "/".join(parts)
+
+
+def validate_gitlink_path(path: str) -> None:
+    parts = pathlib.PurePosixPath(path).parts
+    if len(parts) != 2 or parts[0] != "apps" or parts[1] in {".", ".."}:
+        fail(f"submodule must use one direct apps/ child: {path!r}")
+    if path.startswith("/") or "//" in path or "\\\\" in path or "/../" in path:
+        fail(f"unsafe submodule path: {path!r}")
 
 
 with (ROOT / ".zpkg.toml").open("rb") as handle:
@@ -53,7 +77,10 @@ if not parser.sections():
 submodules: dict[str, str] = {}
 for section in parser.sections():
     path = parser.get(section, "path")
+    validate_gitlink_path(path)
     repo = repo_from_url(parser.get(section, "url"))
+    if path in submodules:
+        fail(f"duplicate submodule path: {path}")
     if repo in submodules.values():
         fail(f"duplicate submodule repository: {repo}")
     submodules[path] = repo
