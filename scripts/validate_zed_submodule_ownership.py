@@ -54,7 +54,15 @@ def validate_gitlink_path(path: str) -> None:
     parts = pathlib.PurePosixPath(path).parts
     if len(parts) != 2 or parts[0] != "apps" or parts[1] in {".", ".."}:
         fail(f"submodule must use one direct apps/ child: {path!r}")
-    if path.startswith("/") or "//" in path or "\\\\" in path or "/../" in path:
+    if (
+        path.startswith("/")
+        or "//" in path
+        or "\\" in path
+        or not all(
+            char.isascii() and (char.isalnum() or char in "._-")
+            for char in parts[1]
+        )
+    ):
         fail(f"unsafe submodule path: {path!r}")
 
 
