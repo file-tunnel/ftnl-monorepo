@@ -21,3 +21,4 @@ jobs:
         with:
           python-version: "3.12"
       - run: python scripts/validate_zed_submodule_ownership.py
+      - run: python scripts/test_submodule_ownership.py
